@@ -1,0 +1,33 @@
+- name: Installer la stack de monitoring (Prometheus, Grafana, Loki)
+  hosts: api
+  become: yes
+
+  vars:
+    monitoring_dir: "/opt/monitoring"
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose
+          - python3-pip
+        state: present
+        update_cache: yes
+      become: yes
+
+    - name: Check if Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      become: yes
+
+    - name: Create monitoring directory
+      file:
+        path: "{{ monitoring_dir }}"
+        state: directory
+        owner: "debian"
+        mode: "0755"
+
+  
