@@ -55,7 +55,7 @@
 
     - name: Copy monitoring configuration files (Prometheus, Grafana, Loki)
       copy:
-        src: "../monitoring/{{ item }}"
+        src: "./monitoring/{{ item }}"
         dest: "{{ monitoring_dir }}/"
         owner: "debian"
       loop:
