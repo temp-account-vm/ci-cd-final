@@ -14,14 +14,17 @@
           - python3-pip
         state: present
         update_cache: yes
-      become: yes
 
     - name: Check if Docker is running
       service:
         name: docker
         state: started
         enabled: yes
-      become: yes
+
+    - name: Install Docker Python package
+      pip:
+        name: docker
+        state: present
 
     - name: Create monitoring directory
       file:
@@ -30,4 +33,30 @@
         owner: "debian"
         mode: "0755"
 
-  
+    - name: Copy monitoring configuration files (Prometheus, Grafana, Loki)
+      copy:
+        src: "../monitoring/{{ item }}"
+        dest: "{{ monitoring_dir }}/"
+        owner: "debian"
+      loop:
+        - prometheus
+        - grafana
+        - loki
+
+    - name: Generate Docker Compose file for monitoring stack
+      template:
+        src: ./monitoring/docker-compose.yml.j2
+        dest: "{{ monitoring_dir }}/docker-compose.yml"
+        owner: "debian"
+        mode: "0644"
+
+    - name: Deploy Docker Compose stack for monitoring
+      community.docker.docker_compose:
+        project_src: "{{ monitoring_dir }}"
+        state: present
+        recreate: always
+      register: output
+
+    - name: Display Docker Compose output
+      debug:
+        var: output  

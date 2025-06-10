@@ -4,15 +4,14 @@ services:
     container_name: grafana
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana:/etc/grafana/provisioning
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }}
+      - ./grafana:/etc/grafana/provisioning
     depends_on:
       - prometheus
     ports:
-      - "3000:3000"
+      - "3001:3000"
     networks:
       - monitoring
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
@@ -27,6 +26,7 @@ services:
       - "9090:9090"
     networks:
       - monitoring
+    restart: unless-stopped
     
   loki:
     image: grafana/loki:latest
@@ -39,12 +39,11 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - monitoring
+    restart: unless-stopped
 
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
-    ports:
-      - "9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -54,6 +53,9 @@ services:
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - monitoring
+    restart: unless-stopped
 
   promtail:
     image: grafana/promtail:latest
@@ -64,6 +66,9 @@ services:
     command: -config.file=/etc/promtail/config.yaml
     networks:
       - monitoring
+    depends_on:
+      - loki
+    restart: unless-stopped
 
 networks:
   monitoring:
