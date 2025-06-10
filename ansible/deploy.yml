@@ -47,6 +47,8 @@
         node -v
       register: node_version_output
       changed_when: false
+      args:
+        executable: /bin/bash
 
     - name: Clone the repository
       git:
