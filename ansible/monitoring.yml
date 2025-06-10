@@ -10,21 +10,27 @@
       apt:
         name:
           - docker.io
-          - docker-compose-plugin
           - python3-pip
+          - docker-compose-plugin
         state: present
         update_cache: yes
 
-    - name: Check if Docker is running
+    - name: Ensure Docker service is running
       service:
         name: docker
         state: started
         enabled: yes
 
-    - name: Install Docker Python package
+    - name: Install Docker Python SDK
       pip:
         name: docker
         state: present
+
+    - name: Ensure docker compose v2 is available
+      shell: docker compose version
+      register: docker_compose_check
+      changed_when: false
+      failed_when: docker_compose_check.rc != 0
 
     - name: Create monitoring directory
       file:
@@ -51,10 +57,10 @@
         mode: "0644"
 
     - name: Deploy Docker Compose stack for monitoring
-      community.docker.docker_compose_v2:
+      community.docker.docker_compose:
         project_src: "{{ monitoring_dir }}"
         state: present
-        pulled: yes
+        recreate: always
       register: output
 
     - name: Display Docker Compose output
