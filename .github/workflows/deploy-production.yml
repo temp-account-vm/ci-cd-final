@@ -112,7 +112,7 @@ jobs:
         REPO_BRANCH: main
       run: |
         echo "Lancement du playbook avec GH_PAT"
-        ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
+        ansible-playbook -i inventory.ini ansible/deploy.yml -vvv --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
 
     - name: Set up Git identity
       run: |

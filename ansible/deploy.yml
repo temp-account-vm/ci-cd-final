@@ -16,8 +16,6 @@
         name:
           - curl
           - git
-          - build-essential
-          - libssl-dev  
         state: present
         update_cache: yes
 
