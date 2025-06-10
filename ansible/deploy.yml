@@ -4,7 +4,8 @@
 
   vars:
     gh_pat: "{{ gh_pat | default(lookup('env', 'GH_PAT')) }}"
-    repo_url: "https://{{ gh_pat }}@github.com/temp-account-vm/gcp-ci-cd-api.git"
+    repo_url: "https://{{ gh_pat }}@github.com/temp-account-vm/ci-cd-final.git"
+    repo_branch: "{{ repo_branch | default(lookup('env', 'REPO_BRANCH')) }}"
     app_root: "/home/debian/api"
     nvm_dir: "/home/debian/.nvm"
     node_version: "22.14.0"
@@ -53,7 +54,7 @@
       git:
         repo: "{{ repo_url }}"
         dest: "{{ app_root }}"
-        version: main
+        version: "{{ repo_branch }}"
         force: yes
       no_log: true
 
