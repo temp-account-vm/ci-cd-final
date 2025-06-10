@@ -1,0 +1,89 @@
+- name: Déployer l'API sur GCP
+  hosts: api
+  become: yes
+
+  vars:
+    gh_pat: "{{ gh_pat | default(lookup('env', 'GH_PAT')) }}"
+    repo_url: "https://{{ gh_pat }}@github.com/temp-account-vm/gcp-ci-cd-api.git"
+    app_root: "/home/debian/api"
+    nvm_dir: "/home/debian/.nvm"
+    node_version: "22.14.0"
+
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - git
+          - build-essential
+          - libssl-dev  
+        state: present
+        update_cache: yes
+
+    - name: Download and install NVM
+      become: false
+      shell: |
+        export PROFILE=/home/debian/.bashrc
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+      args:
+        creates: "{{ nvm_dir }}"
+
+    - name: Load NVM and install Node.js
+      become: false
+      shell: |
+        export NVM_DIR="{{ nvm_dir }}"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install {{ node_version }}
+        nvm alias default {{ node_version }}
+      environment:
+        NVM_DIR: "{{ nvm_dir }}"
+      args:
+        executable: /bin/bash
+
+    - name: Check Node.js version
+      become: false
+      shell: |
+        export NVM_DIR="{{ nvm_dir }}"
+        source $NVM_DIR/nvm.sh
+        node -v
+      register: node_version_output
+      changed_when: false
+
+    - name: Clone the repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_root }}"
+        version: main
+        force: yes
+      no_log: true
+
+    - name: Ensure the app root directory exists
+      file:
+        path: "{{ app_root }}"
+        recurse: yes
+        state: directory
+        owner: "{{ ansible_user | default('debian') }}"
+        group: "{{ ansible_user | default('debian') }}"
+
+    - name: Install npm dependencies
+      become: false
+      shell: |
+        export NVM_DIR="{{ nvm_dir }}"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use {{ node_version }}
+        cd {{ app_root }}/api
+        npm install --production
+      args:
+        executable: /bin/bash
+
+    - name: Start app with PM2
+      shell: |
+        export NVM_DIR="{{ nvm_dir }}"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use {{ node_version }}
+        npm install -g pm2
+        cd {{ app_root }}/api
+        pm2 start index.js --name my-api || pm2 restart my-api
+        pm2 save
+      args:
+        executable: /bin/bash

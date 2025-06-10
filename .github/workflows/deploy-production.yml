@@ -1,0 +1,129 @@
+name: Deploy to Production
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    env:
+      TF_ENV: production
+
+      GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GOOGLE_REGION: ${{ secrets.GOOGLE_REGION }}
+      GOOGLE_ZONE: ${{ secrets.GOOGLE_ZONE }}
+
+      TF_VAR_project: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ secrets.GOOGLE_REGION }}
+      TF_VAR_zone: ${{ secrets.GOOGLE_ZONE }}
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Set GH_PAT environment variable
+      run: echo "GH_PAT=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
+    - name: Restore Terraform state from cache
+      uses: actions/cache@v3
+      with:
+        path: infra/production/terraform.tfstate
+        key: terraform-state-${{ github.ref }} 
+
+    - name: Set up Google Cloud credentials
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Create credentials.json file in infra/
+      run: |
+        mkdir -p infra
+        echo '${{ secrets.GCP_SA_KEY }}' > infra/credentials.json
+
+    - name: Write SSH Pub key in file
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+        chmod 644 ~/.ssh/id_rsa.pub
+
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform init
+      working-directory: ./infra/production
+      run: terraform init
+
+    - name: Terraform apply
+      working-directory: ./infra/production
+      run: terraform apply -auto-approve
+
+    - name: Get VM IP from Terraform output
+      id: get_ip
+      working-directory: ./infra/production
+      run: |
+        IP=$(terraform output -raw instance_ip || echo "")
+        echo "IP récupérée depuis Terraform : $IP"
+        if [ -n "$IP" ]; then
+          echo "IP=$IP" >> $GITHUB_ENV
+        else
+          echo "No instance_ip output found"
+          exit 1
+        fi
+
+    - name: Save Terraform state to cache
+      uses: actions/cache@v3
+      with:
+        path: infra/production/terraform.tfstate
+        key: terraform-state-${{ github.ref }}
+
+    - name: Set up SSH for Ansible
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Setup SSH key file
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+
+    - name: Install Ansible
+      run: |
+        sudo apt update
+        sudo apt install -y ansible python3-pip
+        pip3 install --user ansible
+
+    - name: Create Ansible inventory file
+      run: |
+        echo "[api]" > inventory.ini
+        echo "${{ env.IP }} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory.ini
+
+    - name: Run Ansible playbook (with GH_PAT env)
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        echo "Lancement du playbook avec GH_PAT"
+        ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT}"
+
+    - name: Set up Git identity
+      run: |
+        git config --global user.email "ci-bot@example.com"
+        git config --global user.name "CI Bot"
+
+    - name: Run release script and push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+        chmod +x ./release.sh
+        ./release.sh
+        git push origin main || echo "Aucun changement à pousser"
+        git push origin --tags || echo "Aucun tag à pousser"
