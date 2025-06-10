@@ -1,6 +1,8 @@
 - name: Installer la stack de monitoring (Prometheus, Grafana, Loki)
   hosts: api
   become: yes
+  collection:
+    - community.docker
 
   vars:
     monitoring_dir: "/opt/monitoring"
@@ -11,7 +13,6 @@
         name:
           - docker.io
           - python3-pip
-          - docker-compose-plugin
         state: present
         update_cache: yes
 
@@ -26,11 +27,18 @@
         name: docker
         state: present
 
-    - name: Ensure docker compose v2 is available
+    - name: Check if Docker Compose v2 is available
       shell: docker compose version
       register: docker_compose_check
       changed_when: false
-      failed_when: docker_compose_check.rc != 0
+      failed_when: false
+
+    - name: Install Docker Compose v2 binary if not present
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v2.24.2/docker-compose-linux-x86_64"
+        dest: /usr/local/lib/docker/cli-plugins/docker-compose
+        mode: '0755'
+      when: docker_compose_check.rc != 0
 
     - name: Create monitoring directory
       file:
