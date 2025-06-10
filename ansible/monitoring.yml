@@ -57,7 +57,7 @@
         mode: "0644"
 
     - name: Deploy Docker Compose stack for monitoring
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ monitoring_dir }}"
         state: present
         recreate: always
@@ -65,4 +65,4 @@
 
     - name: Display Docker Compose output
       debug:
-        var: output  
+        var: output
