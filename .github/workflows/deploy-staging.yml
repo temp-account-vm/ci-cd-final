@@ -45,8 +45,8 @@ jobs:
 
     - name: Create credentials.json file in infra/
       run: |
-        mkdir -p infra
-        echo '${{ secrets.GCP_SA_KEY }}' > infra/credentials.json
+        mkdir -p infra/staging
+        echo '${{ secrets.GCP_SA_KEY }}' > infra/staging/credentials.json
 
     - name: Write SSH Pub key in file
       run: |
