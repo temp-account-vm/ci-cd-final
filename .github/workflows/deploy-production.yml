@@ -65,6 +65,12 @@ jobs:
       working-directory: ./infra/production
       run: terraform apply -auto-approve
 
+    - name: Save Terraform state to cache
+      uses: actions/cache@v3
+      with:
+        path: infra/production/terraform.tfstate
+        key: production-terraform-state-${{ github.ref }}
+
     - name: Get VM IP from Terraform output
       id: get_ip
       working-directory: ./infra/production
@@ -77,12 +83,6 @@ jobs:
           echo "No instance_ip output found"
           exit 1
         fi
-
-    - name: Save Terraform state to cache
-      uses: actions/cache@v3
-      with:
-        path: infra/production/terraform.tfstate
-        key: production-terraform-state-${{ github.ref }}
 
     - name: Set up SSH for Ansible
       uses: webfactory/ssh-agent@v0.9.0
