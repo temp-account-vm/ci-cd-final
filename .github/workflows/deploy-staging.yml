@@ -95,11 +95,11 @@ jobs:
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
 
-    - name: Install Ansible
+    - name: Install pip3 and Ansible via pip
       run: |
         sudo apt update
-        sudo apt install -y ansible python3-pip
-        pip3 install --user ansible
+        sudo apt install -y python3-pip
+        pip3 install --upgrade --user ansible
 
     - name: Create Ansible inventory file
       run: |
