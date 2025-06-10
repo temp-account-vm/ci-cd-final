@@ -10,7 +10,7 @@
       apt:
         name:
           - docker.io
-          - docker-compose
+          - docker-compose-plugin
           - python3-pip
         state: present
         update_cache: yes
@@ -51,10 +51,10 @@
         mode: "0644"
 
     - name: Deploy Docker Compose stack for monitoring
-      community.docker.docker_compose:
+      community.docker.docker_compose_v2:
         project_src: "{{ monitoring_dir }}"
         state: present
-        recreate: always
+        pulled: yes
       register: output
 
     - name: Display Docker Compose output
