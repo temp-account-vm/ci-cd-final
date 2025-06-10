@@ -36,7 +36,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: infra/staging/terraform.tfstate
-        key: terraform-state-${{ github.ref }} 
+        key: staging-terraform-state-${{ github.ref }}
 
     - name: Set up Google Cloud credentials
       uses: google-github-actions/auth@v2
@@ -82,7 +82,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: infra/staging/terraform.tfstate
-        key: terraform-state-${{ github.ref }}
+        key: staging-terraform-state-${{ github.ref }}
 
     - name: Set up SSH for Ansible
       uses: webfactory/ssh-agent@v0.9.0
