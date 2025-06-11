@@ -15,7 +15,7 @@
           - curl
           - software-properties-common
           - virtualenv
-        state: present
+        state: latest
         update_cache: true
 
     - name: Add Docker GPG apt Key
@@ -52,7 +52,11 @@
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         mode: "0755"
-      loop: [prometheus, grafana, loki, promtail]
+      loop:
+        - prometheus
+        - grafana
+        - loki
+        - promtail
 
     - name: Copy monitoring configuration files
       ansible.builtin.copy:
@@ -62,7 +66,11 @@
         group: "{{ app_user }}"
         mode: "0644"
         directory_mode: "0755"
-      loop: [prometheus, grafana, loki, promtail]
+      loop:
+        - prometheus
+        - grafana
+        - loki
+        - promtail
 
     - name: Generate Docker Compose file from template
       ansible.builtin.template:
@@ -76,7 +84,7 @@
       community.docker.docker_compose_v2:
         project_src: "{{ app_dir }}"
         state: present
-        pull: smart
+        pull: always
       register: output
 
     - name: Display deployment output
