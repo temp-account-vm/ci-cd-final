@@ -70,11 +70,21 @@ jobs:
         working-directory: ./infra/staging
         run: |
           IP=$(terraform output -raw instance_ip || echo "")
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+
           echo "IP récupérée depuis Terraform : $IP"
+          echo "Disk name récupéré depuis Terraform : $DISK_NAME"
           if [ -n "$IP" ]; then
             echo "IP=$IP" >> $GITHUB_ENV
           else
             echo "No instance_ip output found"
+            exit 1
+          fi
+
+          if [ -n "$DISK_NAME" ]; then
+            echo "DISK_NAME=$DISK_NAME" >> $GITHUB_ENV
+          else
+            echo "No boot_disk_name output found"
             exit 1
           fi
 
@@ -125,7 +135,7 @@ jobs:
         run: |
           echo "Creating snapshots of the VM disk"
 
-          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+          DISK_NAME=env.DISK_NAME
           echo "Boot disk name: $DISK_NAME"
 
           if [ -z "$DISK_NAME" ]; then
@@ -159,7 +169,7 @@ jobs:
             exit 1
           fi
 
-          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+          DISK_NAME=env.DISK_NAME
           echo "Boot disk name: $DISK_NAME"
 
           if [ -z "$DISK_NAME" ]; then

@@ -15,7 +15,7 @@
           - curl
           - software-properties-common
           - virtualenv
-        state: latest
+        state: present
         update_cache: true
 
     - name: Add Docker GPG apt Key
@@ -35,7 +35,7 @@
           - docker-ce-cli
           - containerd.io
           - docker-compose
-        state: latest
+        state: present
         update_cache: true
 
     - name: Add user '{{ app_user }}' to the 'docker' group
@@ -84,7 +84,7 @@
       community.docker.docker_compose_v2:
         project_src: "{{ app_dir }}"
         state: present
-        pull: always
+        pull: smart
       register: output
 
     - name: Display deployment output
