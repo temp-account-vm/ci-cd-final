@@ -1,9 +1,7 @@
 name: Deploy to Staging
 
 permissions:
-  contents: read
-  actions: write
-  id-token: write
+  contents: write
 
 on:
   push:
@@ -11,141 +9,168 @@ on:
       - develop
 
 jobs:
-  provision-infra:
-    name: "Phase 1: Provision Infrastructure"
+  deploy-staging:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    env:
+      TF_ENV: staging
 
-    outputs:
-      instance_ip: ${{ steps.get_outputs.outputs.instance_ip }}
-      boot_disk_name: ${{ steps.get_outputs.outputs.boot_disk_name }}
+      GOOGLE_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+      GOOGLE_REGION: ${{ secrets.GOOGLE_REGION }}
+      GOOGLE_ZONE: ${{ secrets.GOOGLE_ZONE }}
+
+      TF_VAR_project: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ secrets.GOOGLE_REGION }}
+      TF_VAR_zone: ${{ secrets.GOOGLE_ZONE }}
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set GH_PAT environment variable
+        run: echo "GH_PAT=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+
+      - name: Restore Terraform state from cache
+        uses: actions/cache@v3
+        with:
+          path: infra/staging/terraform.tfstate
+          key: staging-terraform-state-${{ github.ref }}
 
       - name: Set up Google Cloud credentials
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Create credentials.json file in infra/
+        run: |
+          mkdir -p infra/staging
+          echo '${{ secrets.GCP_SA_KEY }}' > infra/staging/credentials.json
+
+      - name: Write SSH Pub key in file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 644 ~/.ssh/id_rsa.pub
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Init
-        id: init
+      - name: Terraform init
         working-directory: ./infra/staging
         run: terraform init
 
-      - name: Terraform Apply
-        id: apply
+      - name: Terraform apply
+        id: terraform_apply
         working-directory: ./infra/staging
-        run: terraform apply -auto-approve -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}"
+        run: terraform apply -auto-approve
 
-      - name: Get Terraform Outputs
-        id: get_outputs
+      - name: Get VM IP from Terraform output
         working-directory: ./infra/staging
         run: |
-          IP=$(terraform output -raw instance_ip)
-          DISK_NAME=$(terraform output -raw boot_disk_name)
-          echo "instance_ip=$IP" >> $GITHUB_OUTPUT
-          echo "boot_disk_name=$DISK_NAME" >> $GITHUB_OUTPUT
-          echo "✅ Infrastructure provisionnée. IP: $IP, Disque: $DISK_NAME"
+          IP=$(terraform output -raw instance_ip || echo "")
+          echo "IP récupérée depuis Terraform : $IP"
+          if [ -n "$IP" ]; then
+            echo "IP=$IP" >> $GITHUB_ENV
+          else
+            echo "No instance_ip output found"
+            exit 1
+          fi
 
-      - name: Upload Terraform state as artifact
-        uses: actions/upload-artifact@v4
+      - name: Save Terraform state to cache
+        if: always() && steps.terraform_apply.outcome == 'success'
+        uses: actions/cache@v3
         with:
-          name: terraform-state-staging
           path: infra/staging/terraform.tfstate
+          key: staging-terraform-state-${{ github.ref }}
 
-  configure-application:
-    name: "Phase 2: Configure Application"
-    runs-on: ubuntu-latest
-    needs: provision-infra
-    if: needs.provision-infra.outputs.instance_ip != ''
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Google Cloud credentials (for snapshot)
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Install Python and Ansible
-        run: |
-          sudo apt-get update && sudo apt-get install -y python3-pip
-          pip3 install --user ansible
-
-      - name: Set up SSH key for Ansible
+      - name: Set up SSH for Ansible
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Create Ansible inventory
+      - name: Setup SSH key file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Install pip3 and Ansible via pip
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip
+          pip3 install --upgrade --user ansible
+
+      - name: Create Ansible inventory file
         run: |
           echo "[api]" > inventory.ini
-          echo "${{ needs.provision-infra.outputs.instance_ip }} ansible_user=debian ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'" >> inventory.ini
+          echo "${{ env.IP }} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory.ini
 
-      - name: Run Ansible playbook (Deploy API)
+      - name: Run Ansible playbook (with GH_PAT env)
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           REPO_BRANCH: develop
         run: |
+          echo "Lancement du playbook avec GH_PAT"
           ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
 
-      - name: Run Ansible playbook (Monitoring)
-        run: ansible-playbook -i inventory.ini ansible/monitoring.yml
+      - name: Run Ansible playbook for monitoring
+        run: |
+          echo "Lancement du playbook de monitoring"
+          ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
 
-      - name: Create Success Snapshot
+      - name: Create Snapshots
         if: success()
         run: |
-          echo "📸 Creating snapshot of the VM disk as a record of successful deployment..."
+          echo "Creating snapshots of the VM disk"
+
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+          echo "Boot disk name: $DISK_NAME"
+
+          if [ -z "$DISK_NAME" ]; then
+            echo "No boot disk name found, cannot create snapshot"
+            exit 1
+          fi
+
           SNAPSHOT_NAME="deploy-staging-$(date +%Y%m%d%H%M%S)"
-          gcloud compute disks snapshot ${{ needs.provision-infra.outputs.boot_disk_name }} \
+
+          gcloud compute disks snapshot "$DISK_NAME" \
             --zone="${{ secrets.GOOGLE_ZONE }}" \
             --project="${{ secrets.GCP_PROJECT_ID }}" \
             --snapshot-names="$SNAPSHOT_NAME" \
             --quiet
-          echo "✅ Snapshot '$SNAPSHOT_NAME' created."
 
-  rollback-on-failure:
-    name: "Phase 3: Rollback on Failure"
-    runs-on: ubuntu-latest
-    needs: [provision-infra, configure-application]
-    if: failure() && needs.configure-application.result == 'failure'
+          echo "SNAPSHOT_NAME=$SNAPSHOT_NAME" >> $GITHUB_ENV
 
-    steps:
-      - name: Set up Google Cloud credentials
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Find last successful snapshot
-        id: find_snapshot
+      - name: Rollback on failure
+        if: failure() && steps.terraform_apply.outcome == 'success'
         run: |
-          echo "🔥 Configuration failed. Attempting to rollback..."
+          echo "Rolling back to the last successful snapshot"
+
           LAST_SNAPSHOT=$(gcloud compute snapshots list \
-            --filter="name~'deploy-staging' AND status=READY" \
+            --filter="name~'deploy-staging'" \
             --sort-by="~creationTimestamp" \
             --limit=1 \
             --format="value(name)")
 
           if [ -z "$LAST_SNAPSHOT" ]; then
-            echo "⚠️ No previous snapshot found to rollback to. Manual intervention required."
+            echo "No previous snapshot found, cannot rollback"
             exit 1
           fi
-          echo "snapshot_name=$LAST_SNAPSHOT" >> $GITHUB_OUTPUT
-          echo "✅ Found last snapshot: $LAST_SNAPSHOT"
 
-      - name: Restore VM disk from snapshot
-        run: |
-          gcloud compute disks create ${{ needs.provision-infra.outputs.boot_disk_name }} \
-            --source-snapshot="${{ steps.find_snapshot.outputs.snapshot_name }}" \
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+          echo "Boot disk name: $DISK_NAME"
+
+          if [ -z "$DISK_NAME" ]; then
+            echo "No boot disk name found, cannot rollback"
+            exit 1
+          fi
+
+          gcloud compute disks create "$DISK_NAME" \
+            --source-snapshot="$LAST_SNAPSHOT" \
             --zone="${{ secrets.GOOGLE_ZONE }}" \
             --project="${{ secrets.GCP_PROJECT_ID }}" \
             --quiet
 
-          echo "✅ Rolled back disk '${{ needs.provision-infra.outputs.boot_disk_name }}' to snapshot '${{ steps.find_snapshot.outputs.snapshot_name }}'."
+          echo "Rolled back to snapshot: $LAST_SNAPSHOT"
