@@ -11,6 +11,11 @@
     node_version: "22.14.0"
 
   tasks:
+    - name: Wait for apt-get lock to be released before continuing
+      ansible.builtin.shell: "while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do echo 'Waiting for other apt processes...'; sleep 5; done;"
+      changed_when: false
+      become: true
+    
     - name: Install dependencies
       apt:
         name:
