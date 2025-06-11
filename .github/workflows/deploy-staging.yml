@@ -62,6 +62,7 @@ jobs:
         run: terraform init
 
       - name: Terraform apply
+        id: terraform_apply
         working-directory: ./infra/staging
         run: terraform apply -auto-approve
 
@@ -112,12 +113,12 @@ jobs:
           REPO_BRANCH: develop
         run: |
           echo "Lancement du playbook avec GH_PAT"
-          ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
+          ansible-playbook -i inventory.ini ansible/deploy.yml -vvv --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
 
-      - name: Run Ansible playbook for monitoring
-        run: |
-          echo "Lancement du playbook de monitoring"
-          ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
+      # - name: Run Ansible playbook for monitoring
+      #   run: |
+      #     echo "Lancement du playbook de monitoring"
+      #     ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
 
       - name: Create Snapshots
         if: success()
