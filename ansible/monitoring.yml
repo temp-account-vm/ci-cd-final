@@ -15,10 +15,6 @@
           - python3-pip
         state: present
         update_cache: yes
-      retries: 3
-      delay: 10
-      register: install_result
-      until: install_result is succeeded
 
     - name: Ensure Docker service is running
       service:
@@ -41,13 +37,13 @@
       file:
         path: /usr/local/lib/docker/cli-plugins
         state: directory
-        mode: "0755"
+        mode: '0755'
 
     - name: Install Docker Compose v2 binary if not present
       get_url:
         url: "https://github.com/docker/compose/releases/download/v2.24.2/docker-compose-linux-x86_64"
         dest: /usr/local/lib/docker/cli-plugins/docker-compose
-        mode: "0755"
+        mode: '0755'
       when: docker_compose_check.rc != 0
 
     - name: Create monitoring directory

@@ -66,7 +66,6 @@ jobs:
         run: terraform apply -auto-approve
 
       - name: Get VM IP from Terraform output
-        id: get_ip
         working-directory: ./infra/staging
         run: |
           IP=$(terraform output -raw instance_ip || echo "")
@@ -79,6 +78,7 @@ jobs:
           fi
 
       - name: Save Terraform state to cache
+        if: success() && steps.terraform_apply.outcome == 'success'
         uses: actions/cache@v3
         with:
           path: infra/staging/terraform.tfstate
@@ -117,7 +117,7 @@ jobs:
       - name: Run Ansible playbook for monitoring
         run: |
           echo "Lancement du playbook de monitoring"
-          ansible-playbook -i inventory.ini ansible/monitoring.yml
+          ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
 
       - name: Create Snapshots
         if: success()
