@@ -23,98 +23,140 @@ jobs:
       TF_VAR_zone: ${{ secrets.GOOGLE_ZONE }}
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-        fetch-tags: true
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-    - name: Set GH_PAT environment variable
-      run: echo "GH_PAT=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      - name: Set GH_PAT environment variable
+        run: echo "GH_PAT=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
 
-    - name: Restore Terraform state from cache
-      uses: actions/cache@v3
-      with:
-        path: infra/staging/terraform.tfstate
-        key: staging-terraform-state-${{ github.ref }}
+      - name: Restore Terraform state from cache
+        uses: actions/cache@v3
+        with:
+          path: infra/staging/terraform.tfstate
+          key: staging-terraform-state-${{ github.ref }}
 
-    - name: Set up Google Cloud credentials
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Set up Google Cloud credentials
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - name: Create credentials.json file in infra/
-      run: |
-        mkdir -p infra/staging
-        echo '${{ secrets.GCP_SA_KEY }}' > infra/staging/credentials.json
+      - name: Create credentials.json file in infra/
+        run: |
+          mkdir -p infra/staging
+          echo '${{ secrets.GCP_SA_KEY }}' > infra/staging/credentials.json
 
-    - name: Write SSH Pub key in file
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
-        chmod 644 ~/.ssh/id_rsa.pub
+      - name: Write SSH Pub key in file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 644 ~/.ssh/id_rsa.pub
 
-    - name: Install Terraform
-      uses: hashicorp/setup-terraform@v3
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
 
-    - name: Terraform init
-      working-directory: ./infra/staging
-      run: terraform init
+      - name: Terraform init
+        working-directory: ./infra/staging
+        run: terraform init
 
-    - name: Terraform apply
-      working-directory: ./infra/staging
-      run: terraform apply -auto-approve
+      - name: Terraform apply
+        working-directory: ./infra/staging
+        run: terraform apply -auto-approve
 
-    - name: Get VM IP from Terraform output
-      id: get_ip
-      working-directory: ./infra/staging
-      run: |
-        IP=$(terraform output -raw instance_ip || echo "")
-        echo "IP récupérée depuis Terraform : $IP"
-        if [ -n "$IP" ]; then
-          echo "IP=$IP" >> $GITHUB_ENV
-        else
-          echo "No instance_ip output found"
-          exit 1
-        fi
+      - name: Get VM IP from Terraform output
+        id: get_ip
+        working-directory: ./infra/staging
+        run: |
+          IP=$(terraform output -raw instance_ip || echo "")
+          echo "IP récupérée depuis Terraform : $IP"
+          if [ -n "$IP" ]; then
+            echo "IP=$IP" >> $GITHUB_ENV
+          else
+            echo "No instance_ip output found"
+            exit 1
+          fi
 
-    - name: Save Terraform state to cache
-      uses: actions/cache@v3
-      with:
-        path: infra/staging/terraform.tfstate
-        key: staging-terraform-state-${{ github.ref }}
+      - name: Save Terraform state to cache
+        uses: actions/cache@v3
+        with:
+          path: infra/staging/terraform.tfstate
+          key: staging-terraform-state-${{ github.ref }}
 
-    - name: Set up SSH for Ansible
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Set up SSH for Ansible
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Setup SSH key file
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
+      - name: Setup SSH key file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-    - name: Install pip3 and Ansible via pip
-      run: |
-        sudo apt update
-        sudo apt install -y python3-pip
-        pip3 install --upgrade --user ansible
+      - name: Install pip3 and Ansible via pip
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip
+          pip3 install --upgrade --user ansible
 
-    - name: Create Ansible inventory file
-      run: |
-        echo "[api]" > inventory.ini
-        echo "${{ env.IP }} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory.ini
+      - name: Create Ansible inventory file
+        run: |
+          echo "[api]" > inventory.ini
+          echo "${{ env.IP }} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory.ini
 
-    - name: Run Ansible playbook (with GH_PAT env)
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-        REPO_BRANCH: develop
-      run: |
-        echo "Lancement du playbook avec GH_PAT"
-        ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
+      - name: Run Ansible playbook (with GH_PAT env)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          REPO_BRANCH: develop
+        run: |
+          echo "Lancement du playbook avec GH_PAT"
+          ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
 
-    - name: Run Ansible playbook for monitoring
-      run: |
-        echo "Lancement du playbook de monitoring"
-        ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
+      - name: Run Ansible playbook for monitoring
+        run: |
+          echo "Lancement du playbook de monitoring"
+          ansible-playbook -i inventory.ini ansible/monitoring.yml
+
+      - name: Create Snapshots
+        if: success()
+        run: |
+          echo "Creating snapshots of the VM disk"
+
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "default-disk-name")
+          SNAPSHOT_NAME="deploy-success-$(date +%Y%m%d%H%M%S)"
+
+          gcloud compute disks snapshot "$DISK_NAME" \
+            --zone="${{ secrets.GOOGLE_ZONE }}" \
+            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --snapshot-names="$SNAPSHOT_NAME" \
+            --quiet
+
+          echo "SNAPSHOT_NAME=$SNAPSHOT_NAME" >> $GITHUB_ENV
+
+      - name: Rollback on failure
+        if: failure() && steps.terraform_apply.outcome == 'success'
+        run: |
+          echo "Rolling back to the last successful snapshot"
+
+          LAST_SNAPSHOT=$(gcloud compute snapshots list \
+            --filter="name~'deploy-success'" \
+            --sort-by="~creationTimestamp" \
+            --limit=1 \
+            --format="value(name)")
+
+          if [ -z "$LAST_SNAPSHOT" ]; then
+            echo "No previous snapshot found, cannot rollback"
+            exit 1
+          fi
+
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "default-disk-name")
+
+          gcloud compute disks create "$DISK_NAME" \
+            --source-snapshot="$LAST_SNAPSHOT" \
+            --zone="${{ secrets.GOOGLE_ZONE }}" \
+            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --quiet
+
+          echo "Rolled back to snapshot: $LAST_SNAPSHOT"

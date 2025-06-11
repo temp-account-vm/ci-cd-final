@@ -117,7 +117,7 @@ jobs:
     - name: Run Ansible playbook for monitoring
       run: |
         echo "Lancement du playbook de monitoring"
-        ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
+        ansible-playbook -i inventory.ini ansible/monitoring.yml
 
     - name: Set up Git identity
       run: |
