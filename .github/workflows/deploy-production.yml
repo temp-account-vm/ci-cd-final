@@ -62,10 +62,12 @@ jobs:
       run: terraform init
 
     - name: Terraform apply
+      id: terraform_apply
       working-directory: ./infra/production
       run: terraform apply -auto-approve
 
     - name: Save Terraform state to cache
+      if: steps.terraform_apply.outcome == 'success'
       uses: actions/cache@v3
       with:
         path: infra/production/terraform.tfstate
@@ -133,3 +135,58 @@ jobs:
         ./release.sh
         git push origin main || echo "Aucun changement à pousser"
         git push origin --tags || echo "Aucun tag à pousser"
+
+    - name: Create Snapshots
+      if: success()
+      run: |
+        echo "Creating snapshots of the VM disk"
+
+        DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+        echo "Boot disk name: $DISK_NAME"
+
+        if [ -z "$DISK_NAME" ]; then
+          echo "No boot disk name found, cannot create snapshot"
+          exit 1
+        fi
+
+        SNAPSHOT_NAME="deploy-staging-$(date +%Y%m%d%H%M%S)"
+
+        gcloud compute disks snapshot "$DISK_NAME" \
+          --zone="${{ secrets.GOOGLE_ZONE }}" \
+          --project="${{ secrets.GCP_PROJECT_ID }}" \
+          --snapshot-names="$SNAPSHOT_NAME" \
+          --quiet
+
+        echo "SNAPSHOT_NAME=$SNAPSHOT_NAME" >> $GITHUB_ENV
+
+    - name: Rollback on failure
+      if: failure() && steps.terraform_apply.outcome == 'success'
+      run: |
+        echo "Rolling back to the last successful snapshot"
+
+        LAST_SNAPSHOT=$(gcloud compute snapshots list \
+          --filter="name~'deploy-staging'" \
+          --sort-by="~creationTimestamp" \
+          --limit=1 \
+          --format="value(name)")
+
+        if [ -z "$LAST_SNAPSHOT" ]; then
+          echo "No previous snapshot found, cannot rollback"
+          exit 1
+        fi
+
+        DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+        echo "Boot disk name: $DISK_NAME"
+
+        if [ -z "$DISK_NAME" ]; then
+          echo "No boot disk name found, cannot rollback"
+          exit 1
+        fi
+
+        gcloud compute disks create "$DISK_NAME" \
+          --source-snapshot="$LAST_SNAPSHOT" \
+          --zone="${{ secrets.GOOGLE_ZONE }}" \
+          --project="${{ secrets.GCP_PROJECT_ID }}" \
+          quiet
+
+        echo "Rolled back to snapshot: $LAST_SNAPSHOT"

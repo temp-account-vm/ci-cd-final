@@ -79,7 +79,7 @@ jobs:
           fi
 
       - name: Save Terraform state to cache
-        if: success() && steps.terraform_apply.outcome == 'success'
+        if: steps.terraform_apply.outcome == 'success'
         uses: actions/cache@v3
         with:
           path: infra/staging/terraform.tfstate
@@ -125,8 +125,15 @@ jobs:
         run: |
           echo "Creating snapshots of the VM disk"
 
-          DISK_NAME=$(terraform output -raw boot_disk_name || echo "default-disk-name")
-          SNAPSHOT_NAME="deploy-success-$(date +%Y%m%d%H%M%S)"
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+          echo "Boot disk name: $DISK_NAME"
+
+          if [ -z "$DISK_NAME" ]; then
+            echo "No boot disk name found, cannot create snapshot"
+            exit 1
+          fi
+
+          SNAPSHOT_NAME="deploy-staging-$(date +%Y%m%d%H%M%S)"
 
           gcloud compute disks snapshot "$DISK_NAME" \
             --zone="${{ secrets.GOOGLE_ZONE }}" \
@@ -142,7 +149,7 @@ jobs:
           echo "Rolling back to the last successful snapshot"
 
           LAST_SNAPSHOT=$(gcloud compute snapshots list \
-            --filter="name~'deploy-success'" \
+            --filter="name~'deploy-staging'" \
             --sort-by="~creationTimestamp" \
             --limit=1 \
             --format="value(name)")
@@ -152,7 +159,13 @@ jobs:
             exit 1
           fi
 
-          DISK_NAME=$(terraform output -raw boot_disk_name || echo "default-disk-name")
+          DISK_NAME=$(terraform output -raw boot_disk_name || echo "")
+          echo "Boot disk name: $DISK_NAME"
+
+          if [ -z "$DISK_NAME" ]; then
+            echo "No boot disk name found, cannot rollback"
+            exit 1
+          fi
 
           gcloud compute disks create "$DISK_NAME" \
             --source-snapshot="$LAST_SNAPSHOT" \
