@@ -149,8 +149,7 @@ jobs:
             --zone="$GOOGLE_ZONE" \
             --project="$GOOGLE_PROJECT" \
             --snapshot-names="$SNAPSHOT_NAME" \
-            --quiet \
-            --verbosity
+            --quiet
 
           echo "SNAPSHOT_NAME=$SNAPSHOT_NAME" >> $GITHUB_ENV
 
