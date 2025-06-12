@@ -48,16 +48,6 @@ jobs:
           mkdir -p infra/staging
           echo '${{ secrets.GCP_SA_KEY }}' > infra/staging/credentials.json
 
-      - name: Afficher les variables d'environnement
-        run: |
-          echo "TF_ENV=$TF_ENV"
-          echo "GOOGLE_PROJECT=$GOOGLE_PROJECT"
-          echo "GOOGLE_REGION=$GOOGLE_REGION"
-          echo "GOOGLE_ZONE=$GOOGLE_ZONE"
-          echo "TF_VAR_project=$TF_VAR_project"
-          echo "TF_VAR_region=$TF_VAR_region"
-          echo "TF_VAR_zone=$TF_VAR_zone"
-
       - name: Write SSH Pub key in file
         run: |
           mkdir -p ~/.ssh
@@ -159,7 +149,8 @@ jobs:
             --zone="$GOOGLE_ZONE" \
             --project="$GOOGLE_PROJECT" \
             --snapshot-names="$SNAPSHOT_NAME" \
-            --quiet
+            --quiet \
+            --verbosity
 
           echo "SNAPSHOT_NAME=$SNAPSHOT_NAME" >> $GITHUB_ENV
 

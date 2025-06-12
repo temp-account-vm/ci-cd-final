@@ -3,5 +3,5 @@ output "instance_ip" {
 }
 
 output "boot_disk_name" {
-  value = google_compute_instance.production.boot_disk[0].device_name
+  value = google_compute_instance.production.name
 }
