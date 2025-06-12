@@ -17,6 +17,8 @@
           - virtualenv
         state: present
         update_cache: true
+        retries: 3
+        delay: 5 
 
     - name: Add Docker GPG apt Key
       apt_key:
@@ -37,6 +39,8 @@
           - docker-compose
         state: present
         update_cache: true
+        retries: 3
+        delay: 5 
 
     - name: Add user '{{ app_user }}' to the 'docker' group
       ansible.builtin.user:
