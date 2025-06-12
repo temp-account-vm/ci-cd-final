@@ -48,6 +48,16 @@ jobs:
           mkdir -p infra/staging
           echo '${{ secrets.GCP_SA_KEY }}' > infra/staging/credentials.json
 
+      - name: Afficher les variables d'environnement
+        run: |
+          echo "TF_ENV=$TF_ENV"
+          echo "GOOGLE_PROJECT=$GOOGLE_PROJECT"
+          echo "GOOGLE_REGION=$GOOGLE_REGION"
+          echo "GOOGLE_ZONE=$GOOGLE_ZONE"
+          echo "TF_VAR_project=$TF_VAR_project"
+          echo "TF_VAR_region=$TF_VAR_region"
+          echo "TF_VAR_zone=$TF_VAR_zone"
+
       - name: Write SSH Pub key in file
         run: |
           mkdir -p ~/.ssh
@@ -146,8 +156,8 @@ jobs:
           SNAPSHOT_NAME="deploy-staging-$(date +%Y%m%d%H%M%S)"
 
           gcloud compute disks snapshot "$DISK_NAME" \
-            --zone="${{ secrets.GOOGLE_ZONE }}" \
-            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --zone="${{ GOOGLE_ZONE }}" \
+            --project="${{ GCP_PROJECT_ID }}" \
             --snapshot-names="$SNAPSHOT_NAME" \
             --quiet
 
@@ -179,8 +189,8 @@ jobs:
 
           gcloud compute disks create "$DISK_NAME" \
             --source-snapshot="$LAST_SNAPSHOT" \
-            --zone="${{ secrets.GOOGLE_ZONE }}" \
-            --project="${{ secrets.GCP_PROJECT_ID }}" \
+            --zone="${{ GOOGLE_ZONE }}" \
+            --project="${{ GCP_PROJECT_ID }}" \
             --quiet
 
           echo "Rolled back to snapshot: $LAST_SNAPSHOT"
