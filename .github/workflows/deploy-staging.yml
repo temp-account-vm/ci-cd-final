@@ -135,7 +135,7 @@ jobs:
         run: |
           echo "Creating snapshots of the VM disk"
 
-          DISK_NAME=env.DISK_NAME
+          DISK_NAME=${{ env.DISK_NAME }}
           echo "Boot disk name: $DISK_NAME"
 
           if [ -z "$DISK_NAME" ]; then
@@ -169,7 +169,7 @@ jobs:
             exit 1
           fi
 
-          DISK_NAME=env.DISK_NAME
+          DISK_NAME=${{ env.DISK_NAME }}
           echo "Boot disk name: $DISK_NAME"
 
           if [ -z "$DISK_NAME" ]; then
