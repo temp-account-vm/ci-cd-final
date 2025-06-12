@@ -116,29 +116,29 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Install pip3 and Ansible via pip
-        run: |
-          sudo apt update
-          sudo apt install -y python3-pip
-          pip3 install --upgrade --user ansible
+      # - name: Install pip3 and Ansible via pip
+      #   run: |
+      #     sudo apt update
+      #     sudo apt install -y python3-pip
+      #     pip3 install --upgrade --user ansible
 
-      - name: Create Ansible inventory file
-        run: |
-          echo "[api]" > inventory.ini
-          echo "${{ env.IP }} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory.ini
+      # - name: Create Ansible inventory file
+      #   run: |
+      #     echo "[api]" > inventory.ini
+      #     echo "${{ env.IP }} ansible_user=debian ansible_ssh_private_key_file=~/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no'" >> inventory.ini
 
-      - name: Run Ansible playbook (with GH_PAT env)
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-          REPO_BRANCH: develop
-        run: |
-          echo "Lancement du playbook avec GH_PAT"
-          ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
+      # - name: Run Ansible playbook (with GH_PAT env)
+      #   env:
+      #     GH_PAT: ${{ secrets.GH_PAT }}
+      #     REPO_BRANCH: develop
+      #   run: |
+      #     echo "Lancement du playbook avec GH_PAT"
+      #     ansible-playbook -i inventory.ini ansible/deploy.yml --extra-vars "gh_pat=${GH_PAT} repo_branch=${REPO_BRANCH}"
 
-      - name: Run Ansible playbook for monitoring
-        run: |
-          echo "Lancement du playbook de monitoring"
-          ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
+      # - name: Run Ansible playbook for monitoring
+      #   run: |
+      #     echo "Lancement du playbook de monitoring"
+      #     ansible-playbook -i inventory.ini ansible/monitoring.yml -vvv
 
       - name: Create Snapshots
         if: success()
@@ -157,7 +157,7 @@ jobs:
 
           gcloud compute disks snapshot "$DISK_NAME" \
             --zone="$GOOGLE_ZONE" \
-            --project="$GCP_PROJECT_ID" \
+            --project="$GOOGLE_PROJECT" \
             --snapshot-names="$SNAPSHOT_NAME" \
             --quiet
 
