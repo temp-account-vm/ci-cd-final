@@ -1,0 +1,102 @@
+- name: Deploy Docker Monitoring Stack
+  hosts: api
+  become: yes
+
+  vars:
+    app_dir: "/opt/monitoring"
+    app_user: "debian"
+
+  tasks:
+    - name: Install required system packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - virtualenv
+        state: present
+        update_cache: true
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose
+        state: present
+        update_cache: true
+      register: apt_install_docker_result
+      retries: 3
+      delay: 10
+      until: not apt_install_docker_result.failed
+
+    - name: Add user '{{ app_user }}' to the 'docker' group
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: yes
+      notify: Restart Docker Service
+
+    - name: Create application directories
+      ansible.builtin.file:
+        path: "{{ app_dir }}/{{ item }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+      loop:
+        - prometheus
+        - grafana
+        - loki
+        - promtail
+
+    - name: Copy monitoring configuration files
+      ansible.builtin.copy:
+        src: "../monitoring/{{ item }}/"
+        dest: "{{ app_dir }}/{{ item }}/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+        directory_mode: "0755"
+      loop:
+        - prometheus
+        - grafana
+        - loki
+        - promtail
+
+    - name: Generate Docker Compose file from template
+      ansible.builtin.template:
+        src: ../monitoring/docker-compose.yml.j2
+        dest: "{{ app_dir }}/docker-compose.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Deploy Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+        pull: missing
+      register: output
+
+    - name: Display deployment output
+      ansible.builtin.debug:
+        var: output
+
+  handlers:
+    - name: Restart Docker Service
+      ansible.builtin.service:
+        name: docker
+        state: restarted
