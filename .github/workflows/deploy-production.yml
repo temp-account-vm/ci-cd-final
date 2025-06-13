@@ -64,6 +64,10 @@ jobs:
         working-directory: ./infra/production
         run: terraform init
 
+      - name: Terraform destroy
+        working-directory: ./infra/production
+        run: terraform destroy -auto-approve
+
       - name: Terraform apply
         id: terraform_apply
         working-directory: ./infra/production
@@ -208,6 +212,7 @@ jobs:
           git config --global user.name "CI Bot"
       
       - name: Run release script and push
+        if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
