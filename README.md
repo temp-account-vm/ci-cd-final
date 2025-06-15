@@ -29,7 +29,7 @@
 - **hotfix/*** : corrections urgentes en production
 
 ### Historique de commit et branches
-![Historique de commits](images/Github_Commits_History.png)
+![Historique de commits](images/Github_Commits_History.PNG)
 *Historique des commits sur `develop`*
 
 ---
@@ -54,19 +54,19 @@ Le projet utilise **deux workflows GitHub Actions séparés** pour gérer les d�
 - [Workflow Dev](.github/workflows/deploy-staging.yml)
 - [Workflow Prod](.github/workflows/deploy-production.yml)
 
-![Historique de commits](images/Github_Commits_History.png)
+![Historique de commits](images/Github_Commits_History.PNG)
 *Historique des commits sur `develop`*
 
-![Historique de commits](images/Github_Actions_Workflows.png)
+![Historique de commits](images/Github_Actions_Workflows.PNG)
 *Workflows*
 
-![Historique de commits](images/Github_Action_Summary.png)
+![Historique de commits](images/Github_Action_Summary.PNG)
 *Workflows summary*
 
-![Historique de commits](images/Github_Action_Success_Jobs.png)
+![Historique de commits](images/Github_Action_Success_Jobs.PNG)
 *Jobs (Success)*
 
-![Historique de commits](images/Github_Action_Snapshot.png)
+![Historique de commits](images/Github_Action_Snapshot.PNG)
 *Snapshot*
 
 ---
@@ -111,8 +111,8 @@ Ce workflow garantit un déploiement automatisé, traçable et sécurisé, avec 
 - **Utilisation de git tag** : chaque release est taguée (`git tag v1.0.0`)
 - **Stockage des artefacts** : via GitHub Releases
 
-![Tags](images/Github_Auto_Tags.png)
-![Changelog](images/Github_Auto_Changelog.png)
+![Tags](images/Github_Auto_Tags.PNG)
+![Changelog](images/Github_Auto_Changelog.PNG)
 
 ---
 
@@ -121,7 +121,7 @@ Ce workflow garantit un déploiement automatisé, traçable et sécurisé, avec 
 - **Méthode** : GitHub Secrets pour les clés sensibles
 - **Bonnes pratiques** : aucun secret dans le code source
 
-![Changelog](images/Github_Repository_Secrets.png)
+![Changelog](images/Github_Repository_Secrets.PNG)
 
 ---
 
@@ -129,11 +129,11 @@ Ce workflow garantit un déploiement automatisé, traçable et sécurisé, avec 
 
 Le service **Grafana** est déployé automatiquement avec l’infrastructure et déjà préconfiguré avec un dashboard personnalisé pour le monitoring de l’application. Ce dashboard permet de visualiser en temps réel les métriques collectées par Prometheus (CPU, mémoire, requêtes HTTP, etc.) ainsi que les logs centralisés via Loki.
 
-![Dashboard Grafana](images/Grafana_Dashboard.png)
+![Dashboard Grafana](images/Grafana_Dashboard.PNG)
 *Dashboard Grafana préconfiguré*
 
-![Grafana DataSource](images/Grafana_Data_Sources.png)
-![Grafana Alerts](images/Grafana_CPU_Alert_Rule.png)
+![Grafana DataSource](images/Grafana_Data_Sources.PNG)
+![Grafana Alerts](images/Grafana_CPU_Alert_Rule.PNG)
 
 ---
 
@@ -153,8 +153,8 @@ Le service **Grafana** est déployé automatiquement avec l’infrastructure et 
 
 ---
 
-![API Postman](images/API_Get_Postman_Response.png)
-![API Response](images/API_Get_Response.png)
+![API Postman](images/API_Get_Postman_Response.PNG)
+![API Response](images/API_Get_Response.PNG)
 
 ---
 
